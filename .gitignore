@@ -8,8 +8,6 @@ firebase-adminsdk.json
 *.log
 dist/
 build/
-models/firebase.js
-models/expensenotification-firebase-adminsdk-fbsvc-8b5b99b490.json
 
 
 # Expo
