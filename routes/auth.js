@@ -4,7 +4,7 @@ const User = require("../models/User");
 const Expenses = require("../models/Expenses");
 const getNextSequence = require("../models/Couter");
 const Group = require("../models/Group");
-const admin = require("../models/firebase");
+
 
 // REGISTER
 router.post("/register", async (req, res) => {
@@ -35,7 +35,7 @@ router.post("/register", async (req, res) => {
 router.post("/login", async (req, res) => {
   const { email, phone, password } = req.body;
 
-  console.log(req,"res")
+  console.log(req, "res")
 
   try {
     const user = await User.findOne({
@@ -44,7 +44,7 @@ router.post("/login", async (req, res) => {
 
     if (!user) {
       return res.status(400).json("User not found");
-    } 
+    }
 
     if (user.password !== password) {
       return res.status(400).json("Invalid credentials");
@@ -136,9 +136,7 @@ router.post("/expenses", async (req, res) => {
 
     let savedExpense;
 
-    // ==========================
-    // ADD NEW EXPENSE
-    // ==========================
+
     if (!body.expenseId || body.expenseId === 0) {
       const newId = await getNextSequence("expenseId");
 
@@ -158,7 +156,7 @@ router.post("/expenses", async (req, res) => {
       await savedExpense.save();
 
       if (savedExpense.groupId) {
-        await sendGroupNotification(savedExpense);
+        await sendGroupNotification(savedExpense,"added");
       }
 
       return res.json({
@@ -167,9 +165,7 @@ router.post("/expenses", async (req, res) => {
       });
     }
 
-    // ==========================
-    // UPDATE EXISTING EXPENSE
-    // ==========================
+
     savedExpense = await Expenses.findOneAndUpdate(
       { expenseId: body.expenseId },
       {
@@ -195,14 +191,16 @@ router.post("/expenses", async (req, res) => {
       });
     }
 
+    if (savedExpense.groupId) {
+      await sendGroupNotification(savedExpense,"updated");
+    }
+
     return res.json({
       message: "Expense updated successfully",
       data: savedExpense
     });
 
-    //  if (savedExpense.groupId) {
-    //     await sendGroupNotification(savedExpense);
-    //   }
+
 
   } catch (err) {
     console.log(err);
@@ -461,64 +459,122 @@ router.post("/save-token", async (req, res) => {
 
 
 
-const sendGroupNotification = async (expense) => {
-  console.log(expense,"not1");
-  
+
+
+const sendGroupNotification = async (expense,action) => {
   try {
     const group = await Group.findById(expense.groupId);
-  console.log(group,"not2");
-
 
     if (!group) return;
 
     const phones = group.members.map(x => x.phone);
-  console.log(phones,"not3");
-
 
     const users = await User.find({
       phone: { $in: phones }
     });
 
+    // Get Expo Tokens
     const tokens = users
-      .map(x => x.fcmToken)
+      .map(x => x.fcmToken) // store expoToken in DB
       .filter(token => token);
 
-      console.log(tokens,"not4");
-      
+    console.log(users, tokens, "users to notify");
+
 
     if (tokens.length === 0) return;
 
-    // total spent
+    // Get total expenses
     const expenses = await Expenses.find({
       groupId: expense.groupId
     });
-
 
     const total = expenses.reduce(
       (sum, item) => sum + Number(item.amount),
       0
     );
-  console.log(total,"not3");
+    const username = expense.user.split("@")[0] || expense.name
 
     const bodyText =
-      `${expense.name} ₹${expense.amount} added by ${expense.user}\nTotal: ₹${total}`;
+      `${expense.name} ₹${expense.amount} ${action} by ${username}. Total ₹${total}`;
 
-    await admin.messaging().sendEachForMulticast({
-      tokens,
-      notification: {
-        title: group.groupName,
-        body: bodyText
-      },
+    // Expo messages array
+    const messages = tokens.map(token => ({
+      to: token,
+      sound: "default",
+      title: group.groupName,
+      body: bodyText,
       data: {
         groupId: expense.groupId.toString()
       }
-    });
+    }));
+
+    const response = await fetch(
+      "https://exp.host/--/api/v2/push/send",
+      {
+        method: "POST",
+        headers: {
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(messages)
+      }
+    );
+
+    const result = await response.json();
+    console.log(result);
 
   } catch (err) {
-    
     console.log(err);
   }
 };
+
+
+
+router.delete("/expensesdelete/:expenseId", async (req, res) => {
+  try {
+    const expenseId = Number(req.params.expenseId);
+
+    if (!expenseId) {
+      return res.status(400).json({
+        message: "Invalid expenseId"
+      });
+    }
+
+    // Find and delete by custom expenseId
+    const deletedExpense = await Expenses.findOneAndDelete({
+      expenseId: expenseId
+    });
+
+    if (!deletedExpense) {
+      return res.status(404).json({
+        message: "Expense not found"
+      });
+    }
+
+  
+
+    return res.json({
+      message: "Expense deleted successfully",
+      data: deletedExpense
+    });
+
+  } catch (err) {
+    console.log(err);
+
+    return res.status(500).json({
+      message: "Server Error",
+      error: err.message
+    });
+  }
+});
+
+
+
+
+
+
+
+
 
 
 
