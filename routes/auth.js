@@ -31,26 +31,31 @@ router.post("/register", async (req, res) => {
 });
 
 
-// LOGIN (email OR phone)
+
 router.post("/login", async (req, res) => {
   const { email, phone, password } = req.body;
 
-  console.log(req, "res")
-
   try {
-    const user = await User.findOne({
-      $or: [{ email }, { phone }]
-    });
+    let user;
+
+    // Search by email or phone
+    if (email) {
+      user = await User.findOne({
+        email: { $regex: new RegExp("^" + email + "$", "i") } // ignore case
+      });
+    } else if (phone) {
+      user = await User.findOne({ phone });
+    }
 
     if (!user) {
       return res.status(400).json("User not found");
     }
 
-    if (user.password !== password) {
+    // Password case insensitive
+    if (user.password.toLowerCase() !== password.toLowerCase()) {
       return res.status(400).json("Invalid credentials");
     }
 
-    // No token, just return user data
     res.json({
       message: "Login successful",
       user: {
@@ -488,14 +493,23 @@ const sendGroupNotification = async (expense,action) => {
       groupId: expense.groupId
     });
 
-    const total = expenses.reduce(
-      (sum, item) => sum + Number(item.amount),
-      0
-    );
+    let moneyIn = 0;
+    let moneyOut = 0;
+
+    expenses.forEach((item) => {
+      if (item.expenseType === true) {
+        moneyIn += Number(item.amount);
+      } else {
+        moneyOut += Number(item.amount);
+      }
+    });
+
+    const balance = moneyIn - moneyOut;
+   
     const username = expense.user.split("@")[0] || expense.name
 
     const bodyText =
-      `${expense.name} ₹${expense.amount} ${action} by ${username}. Total ₹${total}`;
+      `${expense.name} ₹${expense.amount} ${action} by ${username}. Balnce ₹${balance}`;
 
     // Expo messages array
     const messages = tokens.map(token => ({
