@@ -584,6 +584,52 @@ router.delete("/expensesdelete/:expenseId", async (req, res) => {
 
 
 
+//delete group and related expensess
+router.delete("/delete-group/:groupId", async (req, res) => {
+  console.log(req,"delete group called");
+  try {
+    const groupId = req.params.groupId;
+
+    if (!groupId) {
+      return res.status(400).json({
+        message: "Invalid groupId"
+      });
+    }
+
+    // 1️⃣ Delete all expenses under this group
+    const deletedExpenses = await Expenses.deleteMany({
+      groupId: groupId
+    });
+
+    // 2️⃣ Delete the group
+    const deletedGroup = await Group.findOneAndDelete({
+      _id: groupId
+    });
+
+    if (!deletedGroup) {
+      return res.status(404).json({
+        message: "Group not found"
+      });
+    }
+
+    return res.json({
+      message: "Group and related expenses deleted successfully",
+      deletedGroup,
+      deletedExpensesCount: deletedExpenses.deletedCount
+    });
+
+  } catch (err) {
+    console.log(err);
+
+    return res.status(500).json({
+      message: "Server Error",
+      error: err.message
+    });
+  }
+});
+
+
+
 
 
 
