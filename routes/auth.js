@@ -629,6 +629,11 @@ router.delete("/delete-group/:groupId", async (req, res) => {
 });
 
 
+router.get("/health", (req, res) => {
+    res.json({ status: "OK" });
+});
+
+
 
 
 
