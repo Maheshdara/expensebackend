@@ -4,6 +4,9 @@ const User = require("../models/User");
 const Expenses = require("../models/Expenses");
 const getNextSequence = require("../models/Couter");
 const Group = require("../models/Group");
+const axios = require("axios");
+
+const PORT = process.env.PORT || 5000;
 
 
 // REGISTER
@@ -635,7 +638,22 @@ router.get("/health", (req, res) => {
 
 
 
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
 
+// Hit health endpoint every 10 minutes
+setInterval(async () => {
+  try {
+    const response = await axios.get(
+      `https://expensebackend-0stp.onrender.com/health`
+    );
+
+    console.log("Health check:", response.data);
+  } catch (error) {
+    console.error("Health check failed:", error.message);
+  }
+}, 10 * 60 * 1000);
 
 
 
