@@ -638,9 +638,9 @@ router.get("/health", (req, res) => {
 
 
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// app.listen(PORT, () => {
+//   console.log(`Server running on port ${PORT}`);
+// });
 
 // Hit health endpoint every 10 minutes
 setInterval(async () => {
